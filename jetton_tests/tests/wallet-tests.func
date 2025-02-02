@@ -535,7 +535,7 @@ int __test_burn_not_owner() {
 	;; changing msg source addres to owner to verify error trigger
 	msg		= generate_internal_message_custom( 0, 0, 0, msg_body, owner, null(), 0 );
 
-	var ( gas_success, _ ) = invoke_method( recv_internal, [ one_unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
+	var ( gas_success, _ ) = invoke_method( recv_internal, [ one unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
 
 	return gas_err + gas_success;
 }
@@ -549,13 +549,13 @@ int __test_burn_too_many() {
 	cell msg       = generate_internal_message_custom( 0, 0, 0, msg_body, owner, null(), 0 );
 
 	;; Should fail with no actions
-	int gas_err    = invoke_method_expect_fail( recv_internal, [ one_unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
+	int gas_err    = invoke_method_expect_fail( recv_internal, [ one unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
 	assert_no_actions();
 
 	;; Now transfer exactly balance to verify error trigger
 	msg_body       = generate_jetton_burn_request( query_id, balance, resp_dst, null() );
 
-	var ( gas_success, _ ) = invoke_method( recv_internal, [ one_unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
+	var ( gas_success, _ ) = invoke_method( recv_internal, [ one unit, one_unit, msg, msg_body.end_cell().begin_parse() ] );
 
 	return gas_err + gas_success;
 }
@@ -663,4 +663,62 @@ int __test_get_wallet_data() {
 	throw_unless( 304, equal_slices( code.begin_parse(), stack.fourth().begin_parse() ) );
 
 	return gas_used;
+}
+
+int __test_recv_internal_transfer() {
+    var (balance, owner, master, code) = load_test_data();
+
+    int query_id = rand(1337) + 1;
+    int forward_ton = one_unit / 10;
+    int transfer_amount = (rand(10) + 1) * one_unit / 10;
+    slice dst = generate_internal_address_with_custom_data(0, 0, random());
+    slice resp_dst = generate_internal_address_with_custom_data(0, 0, random());
+
+    builder msg_body = generate_jetton_transfer_request(query_id, transfer_amount, dst, resp_dst, null(), forward_ton, null(), false);
+    cell msg = generate_internal_message_custom(0, 0, 0, msg_body, owner, null(), forward_ton);
+
+    var (gas_used, _) = invoke_method(recv_internal, [one_unit, one_unit, msg, msg_body.end_cell().begin_parse()]);
+
+    var (new_balance, _, _, _) = load_test_data();
+    throw_unless(605, balance - transfer_amount == new_balance);
+
+    return gas_used;
+}
+
+int __test_recv_internal_internal_transfer() {
+    var (balance, owner, master, code) = load_test_data();
+
+    int query_id = rand(1337) + 1;
+    int forward_ton = one_unit / 10;
+    int transfer_amount = (rand(10) + 1) * one_unit / 10;
+    slice from = generate_internal_address_with_custom_data(0, 0, random());
+    slice dst = generate_internal_address_with_custom_data(0, 0, random());
+
+    builder msg_body = generate_jetton_internal_transfer_request(query_id, transfer_amount, from, dst, forward_ton, null(), false);
+    cell msg = generate_internal_message_custom(0, 0, 0, msg_body, master, null(), 0);
+
+    var (gas_used, _) = invoke_method(recv_internal, [one_unit, one_unit, msg, msg_body.end_cell().begin_parse()]);
+
+    var (new_balance, _, _, _) = load_test_data();
+    throw_unless(606, balance + transfer_amount == new_balance);
+
+    return gas_used;
+}
+
+int __test_recv_internal_burn() {
+    var (balance, owner, master, code) = load_test_data();
+
+    int query_id = rand(1337) + 1;
+    int burn_amount = (rand(10) + 1) * one_unit / 10;
+    slice resp_dst = generate_internal_address_with_custom_data(0, 0, random());
+
+    builder msg_body = generate_jetton_burn_request(query_id, burn_amount, resp_dst, null());
+    cell msg = generate_internal_message_custom(0, 0, 0, msg_body, owner, null(), 0);
+
+    var (gas_used, _) = invoke_method(recv_internal, [one_unit, one_unit, msg, msg_body.end_cell().begin_parse()]);
+
+    var (new_balance, _, _, _) = load_test_data();
+    throw_unless(607, balance - burn_amount == new_balance);
+
+    return gas_used;
 }
