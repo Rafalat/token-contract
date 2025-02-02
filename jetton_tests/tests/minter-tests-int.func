@@ -94,3 +94,43 @@ int __test_get_jetton_data_burn() {
 
 	return gas_before + gas_burn + gas_after;
 }
+
+int __test_recv_internal_mint() {
+    var (total_supply, admin_address, content, code) = load_test_data();
+
+    int query_id = rand(1337) + 1;
+    int forward_ton = one_unit / 10;
+    int mint_amount = (rand(100) + 1) * one_unit / 10;
+    slice rand_addr = generate_internal_address_with_custom_data(0, 0, random());
+    slice mint_dst = generate_internal_address_with_custom_data(0, 0, random());
+    slice mint_from = generate_empty_address();
+
+    cell mint_payload = generate_jetton_internal_transfer_request(query_id, mint_amount, mint_from, rand_addr, forward_ton, null(), false).end_cell();
+    builder mint_body = generate_internal_message_body(op_mint, query_id).store_slice(mint_dst).store_grams(forward_ton).store_ref(mint_payload);
+    cell msg = generate_internal_message_custom(0, 0, 0, mint_body, admin_address, null(), 0);
+
+    var (gas_used, _) = invoke_method(recv_internal, [one_unit, one_unit, msg, mint_body.end_cell().begin_parse()]);
+
+    var (new_supply, _, _, _) = load_test_data();
+    throw_unless(604, total_supply + mint_amount == new_supply);
+
+    return gas_used;
+}
+
+int __test_recv_internal_burn_notification() {
+    var (total_supply, admin_address, content, code) = load_test_data();
+
+    int query_id = rand(1337) + 1;
+    int burn_amount = total_supply / 10;
+    slice sender = generate_internal_address_with_custom_data(0, 0, random());
+    slice src = calculate_user_jetton_wallet_address(sender, my_address(), code);
+    var msg_body = generate_jetton_burn_notification(query_id, burn_amount, sender, admin_address);
+    cell msg = generate_internal_message_custom(0, 0, 0, msg_body, src, null(), 0);
+
+    var (gas_used, _) = invoke_method(recv_internal, [one_unit, one_unit, msg, msg_body.end_cell().begin_parse()]);
+
+    var (new_supply, _, _, _) = load_test_data();
+    throw_unless(603, total_supply - burn_amount == new_supply);
+
+    return gas_used;
+}
